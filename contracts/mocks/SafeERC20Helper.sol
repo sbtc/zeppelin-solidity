@@ -1,84 +1,144 @@
-pragma solidity ^0.4.18;
+// SPDX-License-Identifier: MIT
 
-import '../token/ERC20.sol';
-import '../token/SafeERC20.sol';
+pragma solidity ^0.8.0;
 
-contract ERC20FailingMock is ERC20 {
-  function transfer(address, uint256) public returns (bool) {
-    return false;
-  }
+import "../utils/Context.sol";
+import "../token/ERC20/IERC20.sol";
+import "../token/ERC20/utils/SafeERC20.sol";
 
-  function transferFrom(address, address, uint256) public returns (bool) {
-    return false;
-  }
+contract ERC20ReturnFalseMock is Context {
+    uint256 private _allowance;
 
-  function approve(address, uint256) public returns (bool) {
-    return false;
-  }
+    // IERC20's functions are not pure, but these mock implementations are: to prevent Solidity from issuing warnings,
+    // we write to a dummy state variable.
+    uint256 private _dummy;
 
-  function balanceOf(address) public constant returns (uint256) {
-    return 0;
-  }
+    function transfer(address, uint256) public returns (bool) {
+        _dummy = 0;
+        return false;
+    }
 
-  function allowance(address, address) public constant returns (uint256) {
-    return 0;
-  }
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public returns (bool) {
+        _dummy = 0;
+        return false;
+    }
+
+    function approve(address, uint256) public returns (bool) {
+        _dummy = 0;
+        return false;
+    }
+
+    function allowance(address, address) public view returns (uint256) {
+        require(_dummy == 0); // Duummy read from a state variable so that the function is view
+        return 0;
+    }
 }
 
-contract ERC20SucceedingMock is ERC20 {
-  function transfer(address, uint256) public returns (bool) {
-    return true;
-  }
+contract ERC20ReturnTrueMock is Context {
+    mapping(address => uint256) private _allowances;
 
-  function transferFrom(address, address, uint256) public returns (bool) {
-    return true;
-  }
+    // IERC20's functions are not pure, but these mock implementations are: to prevent Solidity from issuing warnings,
+    // we write to a dummy state variable.
+    uint256 private _dummy;
 
-  function approve(address, uint256) public returns (bool) {
-    return true;
-  }
+    function transfer(address, uint256) public returns (bool) {
+        _dummy = 0;
+        return true;
+    }
 
-  function balanceOf(address) public constant returns (uint256) {
-    return 0;
-  }
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public returns (bool) {
+        _dummy = 0;
+        return true;
+    }
 
-  function allowance(address, address) public constant returns (uint256) {
-    return 0;
-  }
+    function approve(address, uint256) public returns (bool) {
+        _dummy = 0;
+        return true;
+    }
+
+    function setAllowance(uint256 allowance_) public {
+        _allowances[_msgSender()] = allowance_;
+    }
+
+    function allowance(address owner, address) public view returns (uint256) {
+        return _allowances[owner];
+    }
 }
 
-contract SafeERC20Helper {
-  using SafeERC20 for ERC20;
+contract ERC20NoReturnMock is Context {
+    mapping(address => uint256) private _allowances;
 
-  ERC20 failing;
-  ERC20 succeeding;
+    // IERC20's functions are not pure, but these mock implementations are: to prevent Solidity from issuing warnings,
+    // we write to a dummy state variable.
+    uint256 private _dummy;
 
-  function SafeERC20Helper() public {
-    failing = new ERC20FailingMock();
-    succeeding = new ERC20SucceedingMock();
-  }
+    function transfer(address, uint256) public {
+        _dummy = 0;
+    }
 
-  function doFailingTransfer() public {
-    failing.safeTransfer(0, 0);
-  }
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public {
+        _dummy = 0;
+    }
 
-  function doFailingTransferFrom() public {
-    failing.safeTransferFrom(0, 0, 0);
-  }
+    function approve(address, uint256) public {
+        _dummy = 0;
+    }
 
-  function doFailingApprove() public {
-    failing.safeApprove(0, 0);
-  }
+    function setAllowance(uint256 allowance_) public {
+        _allowances[_msgSender()] = allowance_;
+    }
 
-  function doSucceedingTransfer() public {
-    succeeding.safeTransfer(0, 0);
-  }
+    function allowance(address owner, address) public view returns (uint256) {
+        return _allowances[owner];
+    }
+}
 
-  function doSucceedingTransferFrom() public {
-    succeeding.safeTransferFrom(0, 0, 0);
-  }
+contract SafeERC20Wrapper is Context {
+    using SafeERC20 for IERC20;
 
-  function doSucceedingApprove() public {
-    succeeding.safeApprove(0, 0);
-  }
+    IERC20 private _token;
+
+    constructor(IERC20 token) {
+        _token = token;
+    }
+
+    function transfer() public {
+        _token.safeTransfer(address(0), 0);
+    }
+
+    function transferFrom() public {
+        _token.safeTransferFrom(address(0), address(0), 0);
+    }
+
+    function approve(uint256 amount) public {
+        _token.safeApprove(address(0), amount);
+    }
+
+    function increaseAllowance(uint256 amount) public {
+        _token.safeIncreaseAllowance(address(0), amount);
+    }
+
+    function decreaseAllowance(uint256 amount) public {
+        _token.safeDecreaseAllowance(address(0), amount);
+    }
+
+    function setAllowance(uint256 allowance_) public {
+        ERC20ReturnTrueMock(address(_token)).setAllowance(allowance_);
+    }
+
+    function allowance() public view returns (uint256) {
+        return _token.allowance(address(0), address(0));
+    }
 }
